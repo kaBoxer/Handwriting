@@ -7,7 +7,6 @@ import pygame
 from sklearn import datasets
 from sklearn import svm
 
-
 class Pixel(pygame.sprite.Sprite):
     def __init__(self, x, y, gam):
         pygame.sprite.Sprite.__init__(self)
