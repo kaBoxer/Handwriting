@@ -198,7 +198,7 @@ def LoadNewMatrix(digits, PixelMatrix):
 
 
 
-def LearnFromHuman():
+def LearnToClassifyFromInput():
     #this function needs to:
     # direct the human on what to draw (a-zA-Z 0-9) each one 10 times
     # the data needs to be perm. stored somehow.
@@ -287,7 +287,7 @@ def LearnFromHuman():
         oScreen.blit(iFrame.image, iFrame.blitposition)
         pygame.display.update()
 
-def main():
+def PrebuiltImagePrediction():
     #iris = datasets.load_iris()
     digits = datasets.load_digits()
 
@@ -337,7 +337,8 @@ def main():
 #classification
 
 if __name__ == "__main__":
-    LearnFromHuman()
+    #PrebuiltImagePrediction()
+    LearnToClassifyFromInput()
 
     pygame.quit()
     sys.exit()
