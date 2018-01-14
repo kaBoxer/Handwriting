@@ -37,7 +37,22 @@ class InputFrame:
         self.blitposition.center = oScreen.get_rect().center
         #self.blitposition = (oScreen.get_rect().midleft[0], oScreen.get_rect().midleft[1] - (self.rect.height/2))
         self.refresh()
+        self.EmptyDrawSurface = self.GetScreenArray()
 
+    def GetScreenArray(self):
+        o = []
+        for x in xrange(0, self.rect.w):
+            for y in xrange(0, self.rect.h):
+                pix = self.image.get_at((x, y))
+                if pix == (128, 0, 32, 255):  # The lines
+                    d = 1
+                elif pix == (255, 255, 255, 255):  # The Pen
+                    d = 2
+                else:  # The background
+                    d = 0
+                o.append(d)
+                d = None
+        return o
 
     def refresh(self):
         self.image.fill(self.color)
@@ -47,26 +62,25 @@ class InputFrame:
 
 
 class WrittenLettersDataset:
-    def __init__(self):
+    def __init__(self, oScreen):
         self.Data = {}
         self.Target = []
-        self.clf = None
+        self.clf = svm.SVC(gamma=0.0001)
         self.PredictedChar = ""
-        self.SamplesPerSecondWhileLearning = 0.
         self.PredictionLabel = None
+        self.AcceptingCorrection = False
         # 'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
         self.letters = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z',
                '0','1','2','3','4','5','6','7','8','9']
         self.buttons = []
-        print getattr(pygame, "K_%s" % 'a')
         for cchar in self.letters:
             self.buttons.append(getattr(pygame, "K_%s" % cchar))
 
         ##
         #Use this to prompt for new input
         #self.letters = ['a','b','c'] #defghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789]
-        self.InputFrame = None
-        self.EmptyDrawSurface = None
+
+        self.InputFrame = InputFrame(oScreen)
         self.LoadData()
 
     def LoadData(self):
@@ -100,8 +114,8 @@ class WrittenLettersDataset:
 
     def AcceptNewLetterData(self, char, iframe):
         self.PredictedChar = ""
-        self.clf = None
-        o = self.GetScreenArray(iframe)
+        self.AcceptingCorrection = False
+        o = self.InputFrame.GetScreenArray()
 
         if char in self.Data:
             self.Data[char].append(o)
@@ -123,7 +137,6 @@ class WrittenLettersDataset:
                 learningmaterial.append(pixelLists)
                 classification.append(ClassifiedInput)
 
-        #TODO: Test if i can put the below statement outside hte learning function, or if it needs to be there to learn.
         #When training an SVM with the Radial Basis Function (RBF) kernel, two parameters must be considered: C and gamma.
         #--C, common to all SVM kernels, trades off misclassification of training examples against simplicity
         #of the decision surface. A low C makes the decision surface smooth, while a high C aims at classifying all training
@@ -131,49 +144,27 @@ class WrittenLettersDataset:
         #-Gamma defines how much influance a single training session has.
         # http://scikit-learn.org/stable/modules/svm.html#svm-kernels
 
-        #self.clf = svm.SVC(gamma=0.001, C=100.)
-        self.clf = svm.SVC(gamma=0.0001)
         self.clf.fit(learningmaterial, classification)
 
-    def GetScreenArray(self, iframe):
-        o = []
-        for x in xrange(0, iframe.rect.w):
-            for y in xrange(0, iframe.rect.h):
-                pix = iframe.image.get_at((x, y))
-                if pix == (128, 0, 32, 255):  # The lines
-                    d = 1
-                elif pix == (255, 255, 255, 255):  # The Pen
-                    d = 2
-                else:  # The background
-                    d = 0
-                o.append(d)
-                d = None
-        return o
-
     def MakePrediction(self, iframe):
-        # TODO: teach it what a empty thing looks like
+        screenarray = self.InputFrame.GetScreenArray()
+        if screenarray == self.InputFrame.EmptyDrawSurface:
+            text = "Blank Screen."
+            self.PredictionLabel = TextLabel(text, (iframe.rect.size[1] / 2, 15))
+            self.AcceptingCorrection = "TriState"
+            return
         start = dt.datetime.now()
         self.Learn()
         print "Predicting..."
         input = []
-        input.append(self.GetScreenArray(iframe))
-
-        # With 43 samples, this ran in 0.292 seconds
-        # With 225 samples, this ran in 4.842 seconds
+        input.append(screenarray)
         output = self.clf.predict(input)
         text = "Is this %s?" % output[0]  # output
         self.PredictedChar = output[0]
         print text
         self.PredictionLabel = TextLabel(text, (iframe.rect.size[1] / 2, 15))
-        #oScreen.blit(prediction.image, prediction.rect.center)
         print "Time: %f"% (dt.datetime.now()-start).total_seconds()
-
-
-
-class SingleLetters():
-    def __init__(self, classification):
-        self.classification = classification
-        self.data = []
+        self.AcceptingCorrection = True
 
 
 def LoadNewMatrix(digits, PixelMatrix):
@@ -216,18 +207,10 @@ def LearnToClassifyFromInput():
     size = 250, 250
     oScreen = pygame.display.set_mode(size)
     oScreen.fill((0, 0, 0))
-    PixelMatrix = pygame.sprite.Group()
 
     #Load the dataset. Determine the number of class in the dataset, the classes labels, and the sample size in each class.
     #prompt user for more input as needed.
-    HandWrittenLetters = WrittenLettersDataset()
-    iFrame = InputFrame(oScreen)
-    #TODO: Learn what an empty surface looks like and ignore it on predict
-    #for x in xrange(0, iFrame.rect.w):
-    #    for y in xrange(0, iFrame.rect.h):
-    #        c = iFrame.image.get_at((x, y))
-    #        d = c[0] * c[0] + c[1] * c[1] + c[2] * c[2] + c[3] * c[3]
-    #        HandWrittenLetters.EmptyDrawSurface = d
+    HandWrittenLetters = WrittenLettersDataset(oScreen)
     InkMode = False
 
     while True:
@@ -237,10 +220,11 @@ def LearnToClassifyFromInput():
                 return
             if event.type == pygame.MOUSEBUTTONDOWN:
                 InkMode = True
-                if HandWrittenLetters.clf:
-                    HandWrittenLetters.AcceptNewLetterData(HandWrittenLetters.PredictedChar, iFrame)
-                    iFrame.refresh()
+                if HandWrittenLetters.AcceptingCorrection == True:
+                    HandWrittenLetters.AcceptNewLetterData(HandWrittenLetters.PredictedChar, HandWrittenLetters.InputFrame)
+                    HandWrittenLetters.InputFrame.refresh()
                     oScreen.fill((0, 0, 0))  # Clear the thing.
+
             if event.type == pygame.MOUSEBUTTONUP:
                 InkMode = False
 
@@ -253,38 +237,36 @@ def LearnToClassifyFromInput():
                 elif event.key == pygame.K_F3:
                     HandWrittenLetters.ClearData()
                 elif event.key == pygame.K_END:
-                    iFrame.refresh()
+                    HandWrittenLetters.InputFrame.refresh()
                     oScreen.fill((0, 0, 0))  # Clear the thing.
                     HandWrittenLetters.PredictedChar = ""
-                    HandWrittenLetters.clf = None
+                    HandWrittenLetters.AcceptingCorrection = False
                     InkMode = False
-
                 elif event.key == pygame.K_SPACE:
                     InkMode = False
-                    if HandWrittenLetters.clf is None:
-                        HandWrittenLetters.MakePrediction(iFrame)
-                        oScreen.blit(HandWrittenLetters.PredictionLabel.image, oScreen.get_rect().topleft)
-                    else:
-                        HandWrittenLetters.AcceptNewLetterData(HandWrittenLetters.PredictedChar, iFrame)
-                        iFrame.refresh()
+                    if HandWrittenLetters.AcceptingCorrection:
+                        HandWrittenLetters.AcceptNewLetterData(HandWrittenLetters.PredictedChar, HandWrittenLetters.InputFrame)
+                        HandWrittenLetters.InputFrame.refresh()
                         oScreen.fill((0, 0, 0))  # Clear the thing.
+                    else:
+                        HandWrittenLetters.MakePrediction(HandWrittenLetters.InputFrame)
+                        oScreen.blit(HandWrittenLetters.PredictionLabel.image, oScreen.get_rect().topleft)
 
                 elif event.key in HandWrittenLetters.buttons:#This accepts the letter on the keyboard and creates a pixel array to save as a sample.
                     InkMode = False
-                    HandWrittenLetters.AcceptNewLetterData(chr(event.key), iFrame)
-                    iFrame.refresh()
+                    HandWrittenLetters.AcceptNewLetterData(chr(event.key), HandWrittenLetters.InputFrame)
+                    HandWrittenLetters.InputFrame.refresh()
                     oScreen.fill((0, 0, 0))  # Clear the thing.
-
 
             if event.type == pygame.MOUSEMOTION:
                 if pygame.mouse.get_focused():
-                    if  InkMode:
-                        offset = ((iFrame.rect.width/1)*-1, (iFrame.rect.height/1)*-1)
+                    if InkMode:
+                        offset = ((HandWrittenLetters.InputFrame.rect.width/1)*-1, (HandWrittenLetters.InputFrame.rect.height/1)*-1)
                         mousepos = tuple(map(sum, zip(pygame.mouse.get_pos(), offset)))
-                        pygame.draw.circle(iFrame.image, (255, 255, 255), mousepos, 5, 0)
+                        pygame.draw.circle(HandWrittenLetters.InputFrame.image, (255, 255, 255), mousepos, 5, 0)
 
 
-        oScreen.blit(iFrame.image, iFrame.blitposition)
+        oScreen.blit(HandWrittenLetters.InputFrame.image, HandWrittenLetters.InputFrame.blitposition)
         pygame.display.update()
 
 def PrebuiltImagePrediction():
