@@ -65,7 +65,7 @@ class WrittenLettersDataset:
     def __init__(self, oScreen):
         self.Data = {}
         self.Target = []
-        self.clf = svm.SVC(gamma=0.0001)
+        self.clf = svm.SVC(gamma=0.0001) ## Change args here.
         self.PredictedChar = ""
         self.PredictionLabel = None
         self.AcceptingCorrection = False
@@ -129,7 +129,6 @@ class WrittenLettersDataset:
 
     def Learn(self):
         print "Learning..."
-
         learningmaterial = []
         classification = []
         for ClassifiedInput in self.Data.keys():
